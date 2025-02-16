@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "nbech32.h"
 
 struct valid_test_data {
@@ -55,23 +56,102 @@ static int hex_to_bin(uint8_t* out, const char* hex) {
     }
     return 1;
 }
+
+void test_profile_encoding() {
+    printf("\nTesting nprofile encoding/decoding...\n");
+    
+    const char* test_pubkey_hex = "57db485edb747e93b56fb637ee25d75fb2bce0284bed8a85e5a395c097f487e2";
+    const char *test_relays[] = {
+        "wss://ditto.pub/relay",
+        "wss://relay.damus.io",
+        "wss://nos.lol",
+        "wss://minds.com",
+    };
+    const char *expected_nprofile = "nprofile1qqs90k6gtmdhgl5nk4hmvdlwyht4lv4uuq5yhmv2shj689wqjl6g0cspz4mhxue69uhkg6t5w3hjuur4vghhyetvv9usz9rhwden5te0wfjkccte9ejxzmt4wvhxjmcz34w00";
+    
+    uint8_t pubkey[32];
+    char encoded[512];
+    int ok = 1;
+    
+    printf("Debug: Converting pubkey hex to binary\n");
+    if (!hex_to_bin(pubkey, test_pubkey_hex)) {
+        printf("Failed to convert profile pubkey hex\n");
+        return;
+    }
+    
+    printf("Debug: Pubkey conversion successful\n");
+    printf("Debug: Relay 1 length: %zu\n", strlen(test_relays[0]));
+    printf("Debug: Relay 2 length: %zu\n", strlen(test_relays[1]));
+    
+    if (!nostr_encode_profile(encoded, pubkey, test_relays, 2)) {
+        printf("Profile encoding failed\n");
+        return;
+    }
+    
+    
+    printf("Encoded nprofile: %s\n", encoded);
+    if (strcmp(encoded, expected_nprofile) != 0) {
+        printf("Profile encoding mismatch\nGot:      %s\nExpected: %s\n", 
+               encoded, expected_nprofile);
+        ok = 0;
+    }
+    
+    uint8_t decoded_pubkey[32];
+    char **decoded_relays;
+    size_t num_relays;
+    
+    if (!nostr_decode_profile(decoded_pubkey, &decoded_relays, &num_relays, encoded)) {
+        printf("Profile decoding failed\n");
+        ok = 0;
+    } else {
+        // Verify decoded pubkey
+        char decoded_hex[65];
+        for(size_t i = 0; i < 32; i++) {
+            sprintf(decoded_hex + (i * 2), "%02x", decoded_pubkey[i]);
+        }
+        printf("Decoded pubkey: %s\n", decoded_hex);
+        
+        if (strcmp(decoded_hex, test_pubkey_hex) != 0) {
+            printf("Decoded pubkey mismatch\n");
+            ok = 0;
+        }
+        
+        // Verify decoded relays
+        printf("Decoded %zu relays:\n", num_relays);
+        for (size_t i = 0; i < num_relays; i++) {
+            printf("  %s\n", decoded_relays[i]);
+            if (strcmp(decoded_relays[i], test_relays[i]) != 0) {
+                printf("Relay mismatch at index %zu\n", i);
+                ok = 0;
+            }
+        }
+        
+        // Free allocated memory
+        for (size_t i = 0; i < num_relays; i++) {
+            free(decoded_relays[i]);
+        }
+        free(decoded_relays);
+    }
+    
+    printf("Profile test %s\n", ok ? "PASSED" : "FAILED");
+}
+
 int main(void) {
     int fail = 0;
     
     // Test valid encodings
     printf("Starting valid encoding tests...\n");
     for (size_t i = 0; i < sizeof(valid_data) / sizeof(valid_data[0]); ++i) {
-        uint8_t data[32] = {0};  // Initialize to zero
-        char encoded[100] = {0};  // Initialize to zero
+        uint8_t data[32] = {0};
+        char encoded[100] = {0};
         int ok = 1;
 
         printf("Testing case %zu: hex=%s\n", i, valid_data[i].hex);
 
-        // Test encoding
         if (!hex_to_bin(data, valid_data[i].hex)) {
             printf("Failed to convert hex: %s\n", valid_data[i].hex);
             ok = 0;
-            continue;  // Skip rest of this iteration
+            continue;
         }
 
         printf("Hex conversion successful\n");
@@ -89,7 +169,6 @@ int main(void) {
             ok = 0;
         }
 
-        // Test decoding only if encoding was successful
         if (ok) {
             uint8_t decoded[32] = {0};
             size_t decoded_len = 0;
@@ -107,6 +186,9 @@ int main(void) {
 
         fail += !ok;
     }
+
+    // Test nprofile encoding/decoding
+    test_profile_encoding();
 
     printf("Valid encoding tests completed with %d failures\n", fail);
     return fail != 0;

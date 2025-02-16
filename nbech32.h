@@ -110,4 +110,32 @@ int nostr_decode_privkey(uint8_t *privkey, const char *nsec);
  */
 int nostr_decode_note(uint8_t *note_id, const char *note);
 
+/** Encode a profile to nprofile format
+ *  Out: output:  Pointer to a buffer for the null-terminated nprofile string
+ *  In:  pubkey:  32-byte public key
+ *       relays:  Array of relay URLs
+ *       num_relays: Number of relays
+ *  Returns 1 if successful
+ */
+int nostr_encode_profile(
+    char *output,
+    const uint8_t *pubkey,
+    const char **relays,
+    size_t num_relays
+);
+
+/** Decode an nprofile string
+ *  Out: pubkey:     32-byte buffer for the decoded public key
+ *       relays:     Buffer to store relay URLs (caller must free)
+ *       num_relays: Number of relays decoded
+ *  In:  nprofile:   null-terminated nprofile string to decode
+ *  Returns 1 if successful
+ */
+int nostr_decode_profile(
+    uint8_t *pubkey,
+    char ***relays,
+    size_t *num_relays,
+    const char *nprofile
+);
+
 #endif
